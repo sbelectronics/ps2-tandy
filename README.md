@@ -1,4 +1,4 @@
-# PS/2 Keyboard MIDI Controller
+# PS/2 Keyboard to Tandy 1000A Computer Converter
 ## Scott Baker, [http://www.smbaker.com/](http://www.smbaker.com/)
 
 I found a Tandy 1000A on eBay without a keyboard. I grew impatient and wanted to use it.
