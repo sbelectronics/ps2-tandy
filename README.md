@@ -1,18 +1,8 @@
 # PS/2 Keyboard MIDI Controller
 ## Scott Baker, [http://www.smbaker.com/](http://www.smbaker.com/)
 
-This program implements a receiver for a PS/2 keyboard, decodes the scan keys,
-and sends them out as a midi notes at 31,250 baud. The purpose is to implement
-a simple way to play notes on a midi module from a PS/2 keyboard.
-
-I am not a musician, I make no claim to have picked the notes in a 
-particularly sensible manner. I started each major line of the keyboard with
-middle C, and assigned a different instrument to each line. The modifier keys
-and other specials (shift, control, arrows, etc) are assigned to percussion 
-instruments. 
-
-This is based extensively on other peoples' work, see the attribution section below.
-I found a PS/2 keyboard library and a soft-uart library and hooked them together.
+I found a Tandy 1000A on eBay without a keyboard. I grew impatient and wanted to use it.
+So I build an adapter to use a PS2 keyboard on a Tandy 1000A.
 
 ### Pin Assignments:
 
@@ -23,12 +13,6 @@ I found a PS/2 keyboard library and a soft-uart library and hooked them together
     PB4 - Tandy Busy
 
 ### Attribution:
-
-* ATTiny85 UART Library 
-
-      The Garage Lab
-      https://github.com/thegaragelab/tinytemplate
-      Creative Commons Attribution-ShareAlike 4.0 International License (http:// creativecommons.org/licenses/by-sa/4.0/)
 
 * PS/2 Keyboard Library
 
