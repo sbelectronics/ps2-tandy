@@ -12,6 +12,16 @@ So I build an adapter to use a PS2 keyboard on a Tandy 1000A.
     PB3 - Tandy Data
     PB4 - Tandy Busy
 
+### Custom Mappings
+
+Some of the Tandy Keys are different from the PS2 keys...
+
+* PS2 Break - Tandy Break
+* PS2 Ctrl-Break - Tandy Break
+* PS2 Scroll Lock - Tandy Hold
+* PS2 Backslash - Tandy unshifted KP7 or KP4
+* PS2 Backquote - Tandy unshifted KP8 or KP2
+
 ### Attribution:
 
 * PS/2 Keyboard Library

@@ -45,15 +45,32 @@
 
 #define PS2_CAPSLOCK_SCANCODE 0x58
 #define PS2_NUMLOCK_SCANCODE 0x77
+#define PS2_PAUSE_SCANCODE 0x77
+#define PS2_BACKSLASH_SCANCODE 0x5D
+#define PS2_LSHIFT_SCANCODE 0x12
+#define PS2_RSHIFT_SCANCODE 0x59
+#define PS2_BACKQUOTE_SCANCODE 0x0E
+
+#define TANDY_KP2_SCANCODE 0x50
+#define TANDY_KP4_SCANCODE 0x4B
+#define TANDY_KP7_SCANCODE 0x47
+#define TANDY_KP8_SCANCODE 0x48
+#define TANDY_BREAK_SCANCODE 0x54
 
 #define CAPSLOCK_LEDBIT 0x04
 #define NUMLOCK_LEDBIT 0x02
 
+#define LOW 0
+#define HIGH 1
+
 volatile uint8_t kbd_data;
 volatile uint8_t char_waiting;
 volatile uint8_t up_event, down_event;
-volatile uint8_t next_extended, next_otherextended, up_extended, down_extended;
+volatile uint8_t ack_event, nak_event;
+volatile uint8_t next_extended, e1flag, up_extended, down_extended;
 volatile uint8_t key_state[256];
+volatile uint8_t disable_isr;
+volatile uint8_t shift_down;
 uint8_t started;
 uint8_t bit_count;
 uint8_t shift;
@@ -63,10 +80,10 @@ uint8_t release;
 uint8_t capslock;
 uint8_t numlock;
 uint8_t leds;
-uint8_t disable_isr;
 uint8_t ps2_argument;
 uint8_t ps2_have_argument;
-uint8_t ack_event, nak_event;
+
+void map_and_send_scancode(uint8_t data, uint8_t extended, uint8_t modifier);
 
 ISR(PCINT0_vect){
 
@@ -120,28 +137,29 @@ ISR(PCINT0_vect){
     next_extended = 1;
     return;
   } else if (kbd_data == 0xE1) { //the other extended code (pause/break)
-    next_otherextended = 1;
+    e1flag = 1;
     return;
   } else { //not a special character
-    if(release) { //we were in release mode - exit release mode
+    if ((e1flag) && (kbd_data!=0x77) && (kbd_data!=0x14)) {
+      // E1,14,77,E1,F0,14,F0,77 is the pause sequence.
+      // If we see something else, reset the flag.
+      e1flag = 0;
+    }
+    if (release) { //we were in release mode - exit release mode
+      if ((kbd_data == PS2_LSHIFT_SCANCODE) || (kbd_data == PS2_RSHIFT_SCANCODE)) {
+          shift_down = 0;
+      }
       release = 0;
-      if (next_otherextended == 1) {
-	// it's the damn pause/break key. Attempt to ignore this miserable spawn of satan.   
-      } else {
-          up_event = kbd_data;
-          up_extended = next_extended;
-      }
+      up_event = kbd_data;
+      up_extended = next_extended;
       next_extended = 0;
-      next_otherextended = 0;
       key_state[kbd_data] = 0;
-    } else { 
-      if (next_otherextended == 1) {
-   	  // it's the damn pause/break key. Attempt to ignore this miserable spawn of satan.
-      } else {
-          down_event = kbd_data;
-          down_extended = next_extended;
+    } else {
+      if ((kbd_data == PS2_LSHIFT_SCANCODE) || (kbd_data == PS2_RSHIFT_SCANCODE)) {
+          shift_down = kbd_data;
       }
-      next_otherextended = 0;
+      down_event = kbd_data;
+      down_extended = next_extended;
       next_extended = 0;
       char_waiting = 1;
       key_state[kbd_data] = 1;
@@ -185,10 +203,11 @@ void init_keyboard()
   kbd_data = 0;
   bit_count = 0;
   next_extended = 0;
-  next_otherextended = 0;
+  e1flag = 0;
   down_event = 0;
   up_event = 0;
   disable_isr = 0;
+  shift_down = 0;
   ps2_have_argument = 0;
   ack_event = 0;
   nak_event = 0;
@@ -206,46 +225,15 @@ void init_keyboard()
   PCMSK |= (1<<PCINT1);
 }
 
-uint8_t ps2_wait_clk_low(uint16_t ms) {
-    uint16_t i;
-    for (i=0; i<ms*1000; i++) {
-      if ((PINB & PS2_CLK) == 0) {
-        return 1;
-      }
-      _delay_us(1);
+uint8_t wait_for_bit(uint8_t bit, uint8_t highlow, uint16_t ms)
+{
+    if (highlow != LOW) {
+      highlow = bit;
     }
-    // timeout
-    return 0;
-}
 
-uint8_t ps2_wait_clk_high(uint16_t ms) {
     uint16_t i;
     for (i=0; i<ms*1000; i++) {
-      if ((PINB & PS2_CLK) != 0) {
-        return 1;
-      }
-      _delay_us(1);
-    }
-    // timeout
-    return 0;
-}
-
-uint8_t ps2_wait_data_low(uint16_t ms) {
-    uint16_t i;
-    for (i=0; i<ms*1000; i++) {
-      if ((PINB & PS2_DATA) == 0) {
-        return 1;
-      }
-      _delay_us(1);
-    }
-    // timeout
-    return 0;
-}
-
-uint8_t ps2_wait_data_high(uint16_t ms) {
-    uint16_t i;
-    for (i=0; i<ms*1000; i++) {
-      if ((PINB & PS2_DATA) != 0) {
+      if ((PINB & bit) == highlow) {
         return 1;
       }
       _delay_us(1);
@@ -293,7 +281,7 @@ uint8_t ps2_send_byte(uint16_t b)
 {
     int i;
 
-    ps2_wait_clk_high(2);
+    wait_for_bit(PS2_CLK, HIGH, 2);
 
     // bring clock low
     ps2_clk_low();
@@ -306,7 +294,7 @@ uint8_t ps2_send_byte(uint16_t b)
     ps2_clk_release();
 
     // wait for keyboard to bring clock low, up to 15ms
-    if (!ps2_wait_clk_low(15)) {
+    if (!wait_for_bit(PS2_CLK, LOW, 15)) {
       ps2_data_release();
       return 0;
     }
@@ -324,11 +312,11 @@ uint8_t ps2_send_byte(uint16_t b)
         ps2_data_low();
       }
       // wait for clock to go high
-      if (!ps2_wait_clk_high(2)) {
+      if (!wait_for_bit(PS2_CLK, HIGH, 2)) {
         ps2_data_release();
         return 0;
       }
-      if (!ps2_wait_clk_low(2)) {
+      if (!wait_for_bit(PS2_CLK, LOW, 2)) {
         ps2_data_release();
         return 0;
       }
@@ -339,10 +327,10 @@ uint8_t ps2_send_byte(uint16_t b)
     ps2_data_release();
 
     // wait for the ack
-    if (!ps2_wait_data_low(2)) {
+    if (!wait_for_bit(PS2_DATA, LOW, 2)) {
       return 0;
     }
-    if (!ps2_wait_clk_low(2)) {
+    if (!wait_for_bit(PS2_CLK, LOW, 2)) {
       return 0;
     }
 
@@ -409,17 +397,83 @@ void tandy_send(uint8_t data)
   _delay_us(5);
   TANDY_DATA_HIGH;
   // give some time for the LED to be visible
-  _delay_ms(10);
+  _delay_ms(1);
 
   led_off();
 }
 
-uint8_t map_scancode(uint8_t data, uint8_t extended)
+void tandy_send_without_shift(uint8_t data)
 {
+    uint8_t need_shift, need_unshift;
+    uint8_t wrong, shift_to_use;
+
+    // Note: Assumes the user only uses one shift key at a time.
+    //    If the user messes with both shift keys, could get
+    //    confused.
+    
+    need_shift = 0;
+    need_unshift = 0;
+    wrong = (shift_down != 0);
+    if (numlock) {
+        wrong = !wrong;
+    }
+    shift_to_use = shift_down;
+    if (shift_to_use == 0) {
+      shift_to_use = PS2_LSHIFT_SCANCODE;
+    }
+    if (wrong) {
+        if (shift_down != 0) {
+            // break the shift
+            map_and_send_scancode(shift_to_use, 0, 0x80);
+            need_shift = 1;
+        } else {
+            // make the shift
+            map_and_send_scancode(shift_to_use, 0, 0);
+            need_unshift = 1;          
+        }
+    }
+      
+    tandy_send(data);
+    
+    if (need_shift) {
+        // restore the shift by making it
+        map_and_send_scancode(shift_to_use, 0, 0);
+    } else if (need_unshift) {
+        // restore the shift by breaking it
+        map_and_send_scancode(shift_to_use, 0, 0x80);
+    }
+}
+
+void map_and_send_scancode(uint8_t data, uint8_t extended, uint8_t modifier)
+{
+    uint8_t scancode;
+
+    if (data == PS2_BACKSLASH_SCANCODE) {
+      if (shift_down==0) {
+          tandy_send_without_shift(TANDY_KP7_SCANCODE | modifier);  // KP7 or backslash
+      } else {
+          tandy_send_without_shift(TANDY_KP4_SCANCODE | modifier);  // KP4 or vertical bar
+      }
+      return;
+    }
+
+    if (data == PS2_BACKQUOTE_SCANCODE) {
+      if (shift_down==0) {
+          tandy_send_without_shift(TANDY_KP2_SCANCODE | modifier);  // KP2 or backquote
+      } else {
+          tandy_send_without_shift(TANDY_KP8_SCANCODE | modifier);  // KP8 or tilde
+      }
+      return;
+    }
+
     if (extended!=0) {
-        return pgm_read_byte(&(extcode_map[data]));
+        scancode = pgm_read_byte(&(extcode_map[data]));
     } else {
-        return pgm_read_byte(&(scancode_map[data]));
+        scancode = pgm_read_byte(&(scancode_map[data]));
+    }
+
+    if (scancode!=0) {
+        tandy_send(scancode | modifier);
     }
 }
 
@@ -427,13 +481,13 @@ void handle_toggle(uint8_t state, uint8_t scancode, uint8_t ledbit)
 {
   if (state) {
     // send the make
-    tandy_send(map_scancode(scancode, 0));
+    map_and_send_scancode(scancode, 0, 0);
     // update the leds
     leds = leds | ledbit;
     ps2_send_command_argument(0xED, leds);
   } else {
     // send the break
-    tandy_send(map_scancode(scancode, 0) | 0x80);
+    map_and_send_scancode(scancode, 0, 0x80);
     // update the leds
     leds = leds & (~ledbit);
     ps2_send_command_argument(0xED, leds);
@@ -456,22 +510,28 @@ int main() {
 
   while(1) {
     if (up_event != 0) {
-        if (up_event == PS2_CAPSLOCK_SCANCODE) {
-          capslock = !capslock;
-          handle_toggle(capslock, up_event, CAPSLOCK_LEDBIT);
+        if ((e1flag) && (up_event == PS2_PAUSE_SCANCODE)) {
+            e1flag = 0;
+            tandy_send(TANDY_BREAK_SCANCODE | 0x80);
+        } else if (up_event == PS2_CAPSLOCK_SCANCODE) {
+            capslock = !capslock;
+            handle_toggle(capslock, up_event, CAPSLOCK_LEDBIT);
         } else if (up_event == PS2_NUMLOCK_SCANCODE) {
-          numlock = !numlock;
-          handle_toggle(numlock, up_event, NUMLOCK_LEDBIT);
+            numlock = !numlock;
+            handle_toggle(numlock, up_event, NUMLOCK_LEDBIT);
         } else {
-            tandy_send(map_scancode(up_event, up_extended) | 0x80);
+            map_and_send_scancode(up_event, up_extended, 0x80);
         }
         up_event = 0;
     }
     if (down_event != 0) {
-        if ((down_event == PS2_CAPSLOCK_SCANCODE) || (down_event == PS2_NUMLOCK_SCANCODE)) {
+        if ((e1flag) && (down_event == PS2_PAUSE_SCANCODE)) {
+            e1flag = 0;
+            tandy_send(TANDY_BREAK_SCANCODE);
+        } else if ((down_event == PS2_CAPSLOCK_SCANCODE) || (down_event == PS2_NUMLOCK_SCANCODE)) {
             // ignore; we'll handle it on the up event
         } else {
-            tandy_send(map_scancode(down_event, down_extended));
+            map_and_send_scancode(down_event, down_extended, 0);
         }
         down_event = 0;
     }

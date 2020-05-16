@@ -33,6 +33,11 @@ END=chr(231)
 LGUI=chr(232)
 RGUI=chr(233)
 APPS=chr(234)
+BREAK=chr(235)
+BREAKRELEASE=chr(236)
+CTRLBREAK=chr(237)
+CTRLBREAKRELEASE=chr(238)
+PRINTSCR=chr(239)
 
 KP0=chr(240)
 KP1=chr(241)
@@ -111,6 +116,9 @@ ps2_codes=[
   (0x49, '.', '>'),
   (0x4a, '/', '?'),
 
+  (0x45, BREAK, BREAK),  # break when ctrl not held down
+  (0xC5, BREAKRELEASE, BREAKRELEASE),  # break when ctrl not held down
+
   (0x76, ESC, ESC),
   (0x14, LCTRL, LCTRL),
   (0x11, LALT, LALT),
@@ -182,5 +190,6 @@ ps2_extended_codes=[
   (0x74, RARR, RARR),   # EXTENDED
   (0x75, UARR, UARR),   # EXTENDED
   (0x7A, PGDN, PGDN),   # EXTENDED  
-  (0x7D, PGUP, PGUP),   # EXTENDED   
+  (0x7D, PGUP, PGUP),   # EXTENDED  
+  (0x7E, CTRLBREAK, CTRLBREAK),  # EXTENDED 
 ]

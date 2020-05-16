@@ -16,6 +16,9 @@ COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 # symbolic targets:
 all:	ps2tandy.hex
 
+scancode:
+	python ./scott_tandymapgen.py > tandy_scancode_map.h
+
 .c.o:
 	$(COMPILE) -c $< -o $@
 
