@@ -36,6 +36,10 @@ Some of the Tandy Keys are different from the PS2 keys...
 * F1 or F2 ... 1 amp pico-fuse, or a PTC fuse, or just wire it across if you're feeling lucky
 * L1, L2 ... 47 microhenry inductor, do not buy, just wire it across
 
+If you want to build yourself an 8-pin DIN cable for connecting the adapter to your Tandy 1000, then also pick up a pair of CP-1080-ND from digikey. You can also buy 8-pin DIN cables premade on ebay and amazon, and this would save you some wiring effort. I made my own. Also note that the 8th (center) pin is not used, so a 7 pin PIN cable may work just as well.
+
+Note on terminology - The "big" round Tandy connectors are DIN connectors. The "small" round PS2 connectors are mini-DIN connectors. So make sure to get yourself the right connectors.
+
 ### Programming
 
 I programmed the ATTINY85 using a minipro programmer that I bought on ebay. You'll find two files, one of the files holds the fuses. The other file holds the code. The github repo includes a screenshot of the fuse settings.
