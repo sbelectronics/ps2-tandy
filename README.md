@@ -48,6 +48,12 @@ I programmed the ATTINY85 using a minipro programmer that I bought on ebay. You'
 
 These are checked in. Note that the 0.3 design has not been fabricated. It's functionally identical to the 0.1 design that I built in the youtube video, but with obsolete (and occasionally misleading) components removed. I recommend you build the 0.3 design, not the 0.1 design.
 
+Board revisions:
+
+* 0.1 - design used in the video
+* 0.3 - a few small issues with silkscreen. Published to github but not produced.
+* 0.4 - fixed the silkscreen issues in 0.3; sent this one off to jlcpcb as second prototype (misnamed it as 0.3)
+
 ### Attribution:
 
 * PS/2 Keyboard Library
